@@ -476,6 +476,55 @@
         }
     }
 </script>
+
+<!-- localisation -->
+
+<script>
     
+window.onload = function() {
+    // Vérifie si le navigateur supporte la géolocalisation
+    if ("geolocation" in navigator) {
+        const options = {
+            enableHighAccuracy: true, // Force l'utilisation du GPS (plus précis)
+            timeout: 10000,           // Attend maximum 10 secondes
+            maximumAge: 0             // Ne pas utiliser de position en cache
+        };
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                // 1. Centrer la carte sur l'utilisateur
+                map.setView([lat, lon], 16); 
+
+                // 2. Ajouter un marqueur bleu "Moi"
+                L.circleMarker([lat, lon], {
+                    radius: 8,
+                    fillColor: "#007AFF", // Bleu iOS
+                    color: "white",
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 1
+                }).addTo(map).bindPopup("Ou la bò isit").openPopup();
+                
+                console.log("Pozisyon jwenn : ", lat, lon);
+            },
+            (error) => {
+                console.warn("Erè lokalizasyon : ", error.message);
+                // Optionnel : Message si l'utilisateur refuse
+                if(error.code === 1) {
+                    alert("Tanpri pèmèt lokalizasyon pou woutlib ka ede w pi byen.");
+                }
+            },
+            options
+        );
+    } else {
+        console.log("Navigatè a pa sipòte GPS");
+    }
+};
+
+</script>
+
 </body>
 </html>
