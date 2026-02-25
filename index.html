@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ht">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WOUTLIB | PRO</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Orbitron:wght@700&family=Syncopate:wght@700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #FFD700;
+            --danger: #FF3B30;
+            --success: #25D366;
+            --bg: #0A0A0A;
+            --glass: rgba(15, 15, 15, 0.85);
+            --blur: blur(25px);
+        }
+
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; background: #000; font-family: 'Space Grotesk', sans-serif; overflow: hidden; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; background: #000;}
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            position: fixed; top: 0; left: -280px; width: 280px; height: 100%;
+            background: var(--bg); z-index: 4000; transition: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 10px 0 30px rgba(0,0,0,0.8); border-right: 1px solid rgba(255,255,255,0.1);
+            display: flex; flex-direction: column; color: white;
+        }
+        .sidebar.open { left: 0; }
+        .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 3500; display: none; }
+        .sidebar-header { padding: 30px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .user-profile { display: flex; align-items: center; gap: 12px; }
+        .user-avatar { width: 45px; height: 45px; background: var(--primary); color: black; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+        .sidebar-content { flex: 1; padding: 20px; overflow-y: auto; }
+        .sidebar-item { display: flex; align-items: center; gap: 15px; color: white; text-decoration: none; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 15px; }
+        
+        .panic-btn {
+            background: var(--danger); color: white; margin: 20px; padding: 15px;
+            border-radius: 15px; text-align: center; font-weight: bold; cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 59, 48, 0.4); border: none; font-size: 16px;
+        }
+
+        /* --- HEADER (Plis wo kounye a) --- */
+        .header-container { position: fixed; top: 25px; left: 15px; right: 15px; display: flex; align-items: center; gap: 10px; z-index: 1000; }
+        .logo-box { background: var(--primary); color: black; font-family: 'Syncopate', sans-serif; font-size: 11px; font-weight: bold; padding: 12px 10px; border-radius: 15px; box-shadow: 0 8px 20px rgba(255, 215, 0, 0.2); }
+        .search-container { flex: 1; background: var(--glass); backdrop-filter: var(--blur); border-radius: 18px; padding: 2px 15px; display: flex; align-items: center; border: 1px solid rgba(255,255,255,0.1); }
+        .search-container input { background: transparent; border: none; color: white; flex: 1; padding: 10px; font-size: 15px; outline: none; transition: all 0.5s ease; }
+        .hamburger-menu { color: white; font-size: 20px; cursor: pointer; margin-right: 10px; }
+
+        /* --- SPEEDO --- */
+        .speed-widget { position: fixed; bottom: 180px; left: 15px; z-index: 1000; background: var(--glass); backdrop-filter: var(--blur); padding: 10px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); text-align: center; min-width: 60px; }
+        .speed-value { font-family: 'Orbitron', sans-serif; font-size: 22px; color: var(--primary); display: block; }
+        .speed-unit { font-size: 9px; color: white; opacity: 0.6; }
+
+        /* --- WHATSAPP FLOAT --- */
+        .wa-float {
+            position: fixed; bottom: 100px; left: 15px; z-index: 1000;
+            background: var(--success); color: white; padding: 10px;
+            border-radius: 30px; display: flex; align-items: center; gap: 0px;
+            text-decoration: none; font-size: 12px; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3); border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.5s ease; max-width: 40px; overflow: hidden;
+        }
+        .wa-float.show-text { max-width: 200px; padding: 10px 15px; gap: 8px; }
+        .wa-text { white-space: nowrap; opacity: 0; transition: opacity 0.3s; display: none; }
+        .show-text .wa-text { opacity: 1; display: inline; }
+
+        /* --- CONTROLS --- */
+        .side-controls { position: fixed; bottom: 100px; right: 15px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+        .action-btn, .zoom-group { background: var(--glass); backdrop-filter: var(--blur); border: 1px solid rgba(255,255,255,0.15); border-radius: 15px; }
+        .action-btn { width: 50px; height: 50px; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .zoom-group { display: flex; flex-direction: column; }
+        .zoom-btn { width: 50px; height: 50px; background: transparent; border: none; color: white; font-size: 22px; cursor: pointer; }
+        .zoom-btn:first-child { border-bottom: 1px solid rgba(255,255,255,0.1); }
+
+        /* --- MODALE --- */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; z-index: 5000; padding: 20px; }
+        .modal { background: var(--bg); border: 1px solid rgba(255,255,255,0.2); padding: 25px; border-radius: 28px; width: 100%; max-width: 320px; text-align: center; }
+        .mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .mode-card { background: #151515; padding: 15px; border-radius: 18px; border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; }
+        .mode-card svg { width: 32px; height: 32px; }
+        .mode-card.active { border-color: var(--primary); background: #202020; }
+
+        /* --- BOTTOM NAV --- */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10, 10, 10, 0.95); backdrop-filter: var(--blur); height: 85px; display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 2000; border-top: 1px solid rgba(255,255,255,0.1); }
+        .nav-item { text-decoration: none; color: #666; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .nav-item svg { width: 22px; height: 22px; fill: currentColor; }
+        .nav-item.active { color: var(--primary); }
+        .add-btn { width: 60px; height: 60px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #000; margin-top: -50px; border: 6px solid #000; box-shadow: 0 8px 20px rgba(255,215,0,0.3); }
+        .add-btn svg { width: 30px; height: 30px; fill: black; }
+
+        .map-dark { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        .user-location-dot { width: 14px; height: 14px; background: #007AFF; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 15px #007AFF; }
+        
+        .custom-marker-container { display: flex; align-items: center; justify-content: center; }
+        .marker-svg-bg { background: white; border-radius: 50%; padding: 5px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <div class="user-profile">
+                <div class="user-avatar">W</div>
+                <div>
+                    <div style="font-weight:bold;">Itilizatè WoutLib</div>
+                    <div style="font-size:11px; opacity:0.6;">⭐ 5.0 Kontribitè</div>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-content">
+            <a href="#" class="sidebar-item"><span>⛽</span> Estasyon Gaz</a>
+            <a href="#" class="sidebar-item"><span>🚧</span> Trafik & Blokis</a>
+            <a href="#" class="sidebar-item"><span>🔔</span> Istorik Alèt</a>
+            <a href="#" class="sidebar-item"><span>⚙️</span> Paramèt</a>
+        </div>
+        <button class="panic-btn" onclick="triggerPanic()">🚨 SOS / PANIC</button>
+        <div style="padding:15px; text-align:center; font-size:10px; opacity:0.3;">WOUTLIB PRO v2.5</div>
+    </div>
+
+    <div class="header-container">
+        <div class="logo-box">WOUTLIB</div>
+        <div class="search-container">
+            <div class="hamburger-menu" onclick="toggleSidebar()">☰</div>
+            <input type="text" id="animatedSearch" placeholder="Ki kote w prale?">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="opacity:0.6;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+    </div>
+
+    <a href="https://wa.me/50930000000" class="wa-float" id="waFloat" target="_blank">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="white"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zM17.472 14.382c-.301-.149-1.767-.867-2.04-.966-.273-.101-.473-.149-.673.149-.198.299-.769.967-.943 1.165-.175.198-.348.223-.646.074-.242-.121-1.019-.376-1.941-1.196-.718-.639-1.202-1.43-1.343-1.677-.142-.248-.015-.383.11-.507.112-.111.248-.29.373-.435.124-.145.165-.248.248-.414.083-.165.042-.31-.02-.459-.063-.149-.672-1.621-.92-2.222-.241-.586-.486-.506-.672-.516-.172-.008-.371-.01-.57-.01-.198 0-.521.074-.793.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414-.075-.124-.272-.198-.57-.347z"/></svg>
+        <span class="wa-text">Patisipe sou WhatsApp</span>
+    </a>
+
+    <div class="speed-widget">
+        <span class="speed-value" id="speedNum">0</span>
+        <span class="speed-unit">km/h</span>
+    </div>
+
+    <div class="side-controls">
+        <div class="zoom-group">
+            <button class="zoom-btn" onclick="map.zoomIn()">+</button>
+            <button class="zoom-btn" onclick="map.zoomOut()">−</button>
+        </div>
+        <button class="action-btn" onclick="locateUser()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        </button>
+        <button class="action-btn" onclick="toggleModal('mapModal')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        </button>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="modal-overlay" id="mapModal" onclick="toggleModal('mapModal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h3 style="margin:0; color:white; font-size:16px">MODE KAT</h3>
+            <div class="mode-options">
+                <div class="mode-card active" id="btn-sat" onclick="setMapMode('satellite')">
+                    <svg viewBox="0 0 24 24" fill="white"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+                    <span style="color:white; font-size:11px">Satelit</span>
+                </div>
+                <div class="mode-card" id="btn-dark" onclick="setMapMode('dark')">
+                    <svg viewBox="0 0 24 24" fill="white"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/></svg>
+                    <span style="color:white; font-size:11px">Lannwit</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="reportModal" onclick="toggleModal('reportModal')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <h3 style="margin:0; color:white; font-size:16px">KISA W AP RAPÒTE?</h3>
+            <div class="mode-options">
+                <div class="mode-card" onclick="submitReport('gas')">
+                    <svg viewBox="0 0 24 24" fill="#FFD700"><path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v7.5c0 1.66 1.34 3 3 3s3-1.34 3-3V9.5c0-1.02-.34-1.92-.93-2.27zM18 10c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zM12 10H6V5h6v5z"/></svg>
+                    <span style="color:white; font-size:11px">Gaz</span>
+                </div>
+                <div class="mode-card" onclick="submitReport('danger')">
+                    <svg viewBox="0 0 24 24" fill="#FF3B30"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+                    <span style="color:white; font-size:11px">Danger</span>
+                </div>
+                <div class="mode-card" onclick="submitReport('block')">
+                    <svg viewBox="0 0 24 24" fill="#FFD700"><path d="M12 3L2 21h20L12 3zm1 14h-2v-2h2v2zm0-4h-2V9h2v4zM2 22h20v2H2v-2z"/></svg>
+                    <span style="color:white; font-size:11px">Blokis</span>
+                </div>
+                <div class="mode-card" onclick="toggleModal('reportModal')">
+                    <span style="color:white; font-size:11px">Anile</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="#" class="nav-item active">
+            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            <span>Kat</span>
+        </a>
+        <a href="#" class="nav-item">
+            <svg viewBox="0 0 24 24"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+            <span>Alèt</span>
+        </a>
+        <div class="nav-item" onclick="toggleModal('reportModal')">
+            <div class="add-btn">
+                <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </div>
+        </div>
+        <a href="#" class="nav-item">
+            <svg viewBox="0 0 24 24"><path d="M19.77 7.23l-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v7.5c0 1.66 1.34 3 3 3s3-1.34 3-3V9.5c0-1.02-.34-1.92-.93-2.27z"/></svg>
+            <span>Gaz</span>
+        </a>
+        <a href="#" class="nav-item" onclick="toggleSidebar()">
+            <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+            <span>Menu</span>
+        </a>
+    </nav>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const svgData = {
+            danger: `<svg viewBox="0 0 24 24" width="24" height="24" fill="#FF3B30"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`,
+            gas: `<svg viewBox="0 0 24 24" width="24" height="24" fill="#FFD700"><path d="M19.77 7.23l-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33 0 1.38 1.12 2.5 2.5 2.5.36 0 .69-.08 1-.21v7.21c0 .55-.45 1-1 1s-1-.45-1-1V14c0-1.1-.9-2-2-2h-1V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v16h10v-7.5h1.5v7.5c0 1.66 1.34 3 3 3s3-1.34 3-3V9.5c0-1.02-.34-1.92-.93-2.27z"/></svg>`,
+            block: `<svg viewBox="0 0 24 24" width="24" height="24" fill="#FFD700"><path d="M12 3L2 21h20L12 3zm1 14h-2v-2h2v2zm0-4h-2V9h2v4zM2 22h20v2H2v-2z"/></svg>`
+        };
+
+        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([18.5392, -72.335], 14);
+        const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+        const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png');
+        satLayer.addTo(map);
+
+        let userMarker;
+        let userCoords = null;
+        const speedDisplay = document.getElementById('speedNum');
+
+        // --- ANIMASYON TÈKS SEARCH ---
+        const searchInput = document.getElementById('animatedSearch');
+        const phrases = ["Ki kote w prale?", "Chache gaz...", "Evite blokis...", "Kite WoutLib gide w...","Verifye ki zòn ki danje pou kounya..."];
+        let phraseIdx = 0;
+        
+        setInterval(() => {
+            searchInput.style.opacity = 0;
+            setTimeout(() => {
+                phraseIdx = (phraseIdx + 1) % phrases.length;
+                searchInput.placeholder = phrases[phraseIdx];
+                searchInput.style.opacity = 1;
+            }, 500);
+        }, 4000);
+
+        // --- ANIMASYON WHATSAPP (Chak 8 segonn) ---
+        const waFloat = document.getElementById('waFloat');
+        setInterval(() => {
+            waFloat.classList.toggle('show-text');
+        }, 5000);
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            const over = document.getElementById('sidebarOverlay');
+            over.style.display = (over.style.display === 'block') ? 'none' : 'block';
+        }
+
+        function toggleModal(id) {
+            const m = document.getElementById(id);
+            m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        function triggerPanic() {
+            if(!userCoords) { alert("Aktive GPS ou!"); return; }
+            if(confirm("Voye SOS?")) {
+                const msg = `URGENT: Mwen bezwen èd! http://maps.google.com/?q=${userCoords.lat},${userCoords.lng}`;
+                window.location.href = `sms:?body=${encodeURIComponent(msg)}`;
+            }
+        }
+
+        function setMapMode(mode) {
+            map.eachLayer(l => { if(l !== userMarker) map.removeLayer(l); });
+            const mapDiv = document.querySelector('.leaflet-tile-pane');
+            mapDiv.className = 'leaflet-tile-pane';
+            if(mode === 'dark') {
+                darkLayer.addTo(map); mapDiv.classList.add('map-dark');
+                document.getElementById('btn-dark').classList.add('active');
+                document.getElementById('btn-sat').classList.remove('active');
+            } else {
+                satLayer.addTo(map);
+                document.getElementById('btn-sat').classList.add('active');
+                document.getElementById('btn-dark').classList.remove('active');
+            }
+            displayReports();
+            setTimeout(() => toggleModal('mapModal'), 300);
+        }
+
+        function locateUser() {
+            map.locate({setView: true, maxZoom: 17, watch: true});
+        }
+
+        map.on('locationfound', function(e) {
+            userCoords = e.latlng;
+            if (e.speed > 0) speedDisplay.innerText = Math.round(e.speed * 3.6);
+            if (userMarker) map.removeLayer(userMarker);
+            userMarker = L.marker(e.latlng, {
+                icon: L.divIcon({ className: 'user-location-dot', iconSize: [14, 14] })
+            }).addTo(map);
+        });
+
+        const reports = [
+            { lat: 18.542, lng: -72.332, type: 'danger', title: 'Tansyon wo', desc: 'Evite zòn sa.' },
+            { lat: 18.535, lng: -72.345, type: 'gas', title: 'Gaz Disponib', desc: 'Estasyon Total la gen gaz.' },
+            { lat: 18.548, lng: -72.320, type: 'block', title: 'Wout Bloke', desc: 'Kamyon an travè.' }
+        ];
+
+        function displayReports() {
+            reports.forEach(rep => {
+                const markerIcon = L.divIcon({
+                    className: 'custom-marker-container',
+                    html: `<div class="marker-svg-bg">${svgData[rep.type]}</div>`,
+                    iconSize: [35, 35],
+                    iconAnchor: [17, 35]
+                });
+                L.marker([rep.lat, rep.lng], { icon: markerIcon }).addTo(map).bindPopup(`<strong>${rep.title}</strong><br>${rep.desc}`);
+            });
+        }
+
+        function submitReport(type) {
+            if (!userCoords) { alert("GPS la poko jwenn ou."); return; }
+            let title = type === 'gas' ? 'Gaz' : (type === 'danger' ? 'Danger' : 'Blokis');
+            reports.push({ lat: userCoords.lat, lng: userCoords.lng, type: type, title: title, desc: 'Rapòte pa itilizatè.' });
+            displayReports();
+            toggleModal('reportModal');
+        }
+
+        displayReports();
+    </script>
+</body>
+</html>
